@@ -8,20 +8,8 @@ import pandas as pd
 df=pd.read_csv('visitor_data_native.csv',delimiter='|',low_memory=False)
 updated_cols=['ts_date', 'hour', 'conversion_status','raw_publisher_id','enriched_country', 'enriched_derived_device', 'enriched_derived_os','enriched_publisher_domain', 'ad_adgroup_id', 'ad_advertiser_id','ad_campaign_id', 'ad_keyword','click_browser', 'click_state','click_city', 'click_click_status', 'conv_weight', 'conv_value', 'top_level_category_name','seller_tag_id', 'integration_type', 'visitor_id']
 new_df=df[updated_cols].sort_values(by=['ts_date','hour'])
+new_df[['in_date']] = new_df[['ts_date']].applymap(str).applymap(lambda s: "{}/{}/{}".format(s[4:6],s[6:], s[0:4]))
 
-
-
-def generate_table(dataframe, max_rows=1000):
-    return html.Table([
-        html.Thead(
-            html.Tr([html.Th(col) for col in dataframe.columns])
-        ),
-        html.Tbody([
-            html.Tr([
-                html.Td(dataframe.iloc[i][col]) for col in dataframe.columns
-            ]) for i in range(min(len(dataframe), max_rows))
-        ])
-    ])
 
 
 app = Dash(__name__)
@@ -57,6 +45,8 @@ app.layout = html.Div([
 
     html.H4(children='Visitor Data'),
 
+    dcc.Graph(id='timeline_graph'),
+
     html.Div(id='div-1'),
 
     #dash_table.DataTable(new_df.to_dict('records'), [{"name": i, "id": i} for i in new_df.columns])
@@ -69,6 +59,7 @@ app.layout = html.Div([
 ],style={'display': 'flex', 'flex-direction': 'column'})
 
 @app.callback(
+    Output('timeline_graph','figure'),
     Output('graph','figure'),
     Output('conv_status', 'figure'),
     Output('div-1', 'children'),
@@ -90,12 +81,15 @@ def update_graph(visitor_id,start_date,end_date):
 
     fig_conv= px.pie(dff_grouped_conv, names='conversion_status', values='count',title='Conversion Status in the given period')
 
+    fig_timeline =px.scatter(dff_2,x='in_date', y='hour',color='top_level_category_name',hover_data=['conversion_status'])
+
+
 
     df_grouped = new_dff_2.groupby(['enriched_country'])['enriched_country'].count()
     dff_3=pd.DataFrame({'enriched_country':df_grouped.index, 'count':df_grouped.values})
 
     fig = px.pie(dff_3, values='count', names='enriched_country', title='Population of European continent')
-    return fig,fig_conv,dash_table.DataTable(dff_2.to_dict('records'), [{"name": i, "id": i} for i in dff_2.columns])
+    return  fig_timeline,fig,fig_conv,dash_table.DataTable(dff_2.to_dict('records'), [{"name": i, "id": i} for i in dff_2.columns])
 
 
 
