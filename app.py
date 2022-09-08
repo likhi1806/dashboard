@@ -4,14 +4,18 @@
 from dash import Dash, html, dcc, Input, Output,dash_table
 import plotly.express as px
 import pandas as pd
+import numpy as np
 
 df=pd.read_csv('visitor_data_native.csv',delimiter='|',low_memory=False)
 updated_cols=['ts_date', 'hour', 'conversion_status','raw_publisher_id','enriched_country', 'enriched_derived_device', 'enriched_derived_os','enriched_publisher_domain', 'ad_adgroup_id', 'ad_advertiser_id','ad_campaign_id', 'ad_keyword','click_browser', 'click_state','click_city', 'click_click_status', 'conv_weight', 'conv_value', 'top_level_category_name','seller_tag_id', 'integration_type', 'visitor_id']
-categorical_values=['raw_publisher_id','enriched_country', 'enriched_derived_device', 'enriched_derived_os','enriched_publisher_domain', 'ad_adgroup_id', 'ad_advertiser_id','ad_campaign_id', 'ad_keyword','click_browser', 'click_state','click_city', 'click_click_status','top_level_category_name','seller_tag_id', 'integration_type']
+categorical_values=['conversion_status','raw_publisher_id','enriched_country', 'enriched_derived_device', 'enriched_derived_os','enriched_publisher_domain', 'ad_adgroup_id', 'ad_advertiser_id','ad_campaign_id', 'ad_keyword','click_browser', 'click_state','click_city', 'click_click_status','top_level_category_name','seller_tag_id', 'integration_type']
 new_df=df[updated_cols].sort_values(by=['ts_date','hour'])
 new_df[['in_date']] = new_df[['ts_date']].applymap(str).applymap(lambda s: "{}/{}/{}".format(s[4:6],s[6:], s[0:4]))
-
-
+new_df[['time']]=new_df[['hour']].applymap(str)
+new_df['time_str']=new_df['time'].str.zfill(2)
+new_df['in_date']=new_df['in_date'].apply(lambda s:s+"T")
+new_df['date_time']=new_df['in_date']+new_df['time_str']
+ 
 
 app = Dash(__name__)
 
@@ -195,6 +199,10 @@ def dashboard(visitor_id,start_date,end_date,req_attr,top_level_category_name_la
     dff = new_df[new_df['visitor_id']==visitor_id]
     dff_1 =dff[dff['ts_date']>=start_date]
     dff_2=dff_1[dff_1['ts_date']<=end_date]
+
+   # dff_2=dff_11.groupby('date_time',as_index=False)
+
+    #dff_2['Event_number']= dff_2.groupby('date_time').cumcount()+1
      
     df_grouped_conv = dff_2.groupby(['conversion_status'])['conversion_status'].count()
     dff_grouped_conv=pd.DataFrame({'conversion_status':df_grouped_conv.index, 'count':df_grouped_conv.values})
@@ -206,32 +214,52 @@ def dashboard(visitor_id,start_date,end_date,req_attr,top_level_category_name_la
     flag=1
 
     if top_level_category_name_label is not None and len(top_level_category_name_label)!=0:
+        flag=0
+        if 'top_level_category_name' not in req_attr:
+            top_level_category_name_label=[]
+            flag=1
+        else:
+            dff_timeline=dff_2.loc[dff_2.top_level_category_name.isin(top_level_category_name_label)]
         print("cate: ")
         print(top_level_category_name_label)
-        flag=0
-        dff_timeline=dff_2.loc[dff_2.top_level_category_name.isin(top_level_category_name_label)]
+        
 
     if click_browser_label is not None and len(click_browser_label)!=0:
+        
+        flag=0
+        if 'click_browser' not in req_attr:
+            click_browser_label =[]
+            flag=1
+        else:
+            dff_timeline=dff_timeline.loc[dff_timeline.click_browser.isin(click_browser_label)]
+
         print("browser: ")
         print(click_browser_label)
-        flag=0
-        dff_timeline=dff_timeline.loc[dff_timeline.click_browser.isin(click_browser_label)]
     
     if enriched_country_label is not None and len(enriched_country_label)!=0:
+        flag=0
+        if 'enriched_country' not in req_attr:
+            enriched_country_label =[]
+            flag=1
+        else:
+            dff_timeline=dff_timeline.loc[dff_timeline.enriched_country.isin(enriched_country_label)]
         print("country: ")
         print(enriched_country_label)
-        flag=0
-        dff_timeline=dff_timeline.loc[dff_timeline.enriched_country.isin(enriched_country_label)]
-
-    if flag==1:
-        fig_timeline =px.scatter(dff_2,x='in_date', y='hour',hover_data=req_attr)
-
-    else:
-        fig_timeline =px.scatter(dff_timeline,x='in_date', y='hour',hover_data=req_attr)
-        
     
+    dff_timeline['Event_number']= dff_timeline.groupby('date_time').cumcount()+1
+    dff_timeline['conversion_status']=dff_timeline['conversion_status'].astype(str)
+    if flag==1:
+        #fig_timeline =px.scatter(dff_2,x='in_date', y='hour',hover_data=req_attr)
+        fig_timeline =px.scatter(dff_timeline,x='date_time', y='Event_number',color='conversion_status',hover_data=req_attr)
+    else:
+        #fig_timeline =px.scatter(dff_timeline,x='in_date', y='hour',hover_data=req_attr)
+        fig_timeline =px.scatter(dff_timeline,x='date_time', y='Event_number',color='conversion_status',hover_data=req_attr)
+        
+    #top_level_category_name_label=[]
+    #click_browser_label =[]
+    #enriched_country_label =[]
 
-
+    fig_timeline.update_yaxes(visible=False, showticklabels=False)
 
     df_grouped = dff_2.groupby(['enriched_country'])['enriched_country'].count()
     dff_3=pd.DataFrame({'enriched_country':df_grouped.index, 'count':df_grouped.values})
