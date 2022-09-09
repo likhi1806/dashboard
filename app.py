@@ -15,7 +15,7 @@ new_df[['time']]=new_df[['hour']].applymap(str)
 new_df['time_str']=new_df['time'].str.zfill(2)
 new_df['in_date']=new_df['in_date'].apply(lambda s:s+"T")
 new_df['date_time']=new_df['in_date']+new_df['time_str']
- 
+new_df=new_df.sort_values(by=['visitor_id','date_time'])
 
 app = Dash(__name__)
 
