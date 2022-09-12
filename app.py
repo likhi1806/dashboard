@@ -1,7 +1,7 @@
 # Run this app with `python app.py` and
 # visit http://127.0.0.1:8050/ in your web browser.
 
-from dash import Dash, html, dcc, Input, Output,dash_table
+from dash import Dash, html, dcc, Input, Output,dash_table,State, ALL
 import plotly.express as px
 import pandas as pd
 import numpy as np
@@ -16,6 +16,23 @@ new_df['time_str']=new_df['time'].str.zfill(2)
 new_df['in_date']=new_df['in_date'].apply(lambda s:s+"T")
 new_df['date_time']=new_df['in_date']+new_df['time_str']
 new_df=new_df.sort_values(by=['visitor_id','date_time'])
+list_col = updated_cols
+temp_list1 ={}
+temp_list2 ={}
+cnt=0
+for col in list_col:
+        temp_list1[col]=html.Div([html.Label(col,id={
+                'type': 'dynamic-output_label',
+                'index': cnt
+            }),],style={'display':'block'})
+
+        temp_list2[col]=html.Div([dcc.Dropdown(id={
+                'type': 'dynamic-output',
+                'index': cnt
+            },options=[i for i in new_df[col].unique()],multi=True)],style={'display':'block'})
+
+        cnt+=1
+
 
 app = Dash(__name__)
 
@@ -54,85 +71,19 @@ app.layout = html.Div([
                  placeholder="Select columns", 
                  multi=True,
                  id='req_attr'
+
+
     ),
     
     html.Br(),
 
+    html.Div(children=[],id= 'dynamic_dropdown'),
 
-    html.Div(
-        [   
-            html.Div([
-                html.Label('Top_level_category_name',id='dynamic-dropdown-container1'),
-                ],
-            style={
-                'display':'block'
-                }   
-            ),
-
-            html.Div([
-                dcc.Dropdown(
-                    id='top_level_category_name_label',
-                    options=[i for i in new_df.top_level_category_name.unique()],
-                    multi=True
-            )],
-            style={
-                'display':'block'
-                }   
-            ),
-
-            html.Div([
-                html.Label('Browser',id='dynamic-dropdown-container2'),
-                ],
-            style={
-                'display':'block'
-                }   
-            ),
-
-
-            html.Div([
-                dcc.Dropdown(
-                    id='click_browser_label',
-                    options=[i for i in new_df.click_browser.unique()],
-                    multi=True
-                )],
-                style={
-                    'display':'block'
-                }    
-            ),
-
-            html.Div([
-                html.Label('Enriched_country',id='dynamic-dropdown-container3'),
-                ],
-            style={
-                'display':'block'
-                }   
-            ),
-
-            html.Div([
-                dcc.Dropdown(
-                    id='enriched_country_label',
-                    options=[i for i in df.enriched_country.unique()],
-                    multi=True
-            )],
-            style={
-                'display':'block'
-                }   
-            ),
-        ],
-    ),
-
-    
-
-
-
+    #html.Button(id='submit-button-state', n_clicks=0, children='Submit'),
 
     html.H4(children='Visitor Timeline'),
-
     dcc.Graph(id='timeline_graph'),
 
-    #html.Div(id='div-1'),
-
-    #dash_table.DataTable(new_df.to_dict('records'), [{"name": i, "id": i} for i in new_df.columns])
 
     dcc.Graph(id='conv_status'),
     dcc.Graph(id='graph')  
@@ -141,42 +92,24 @@ app.layout = html.Div([
     
 ],style={'display': 'flex', 'flex-direction': 'column'})
 
-
-
-@app.callback(
-    Output('dynamic-dropdown-container1','style'),
-    Output('top_level_category_name_label','style'),
-    Input('req_attr','value')
-)
-def category_dropdown(req_attr):
-    if req_attr is not None and 'top_level_category_name' in req_attr:
-        return {'display': 'block'},{'display': 'block'}
-    else:
-        return {'display': 'none'},{'display': 'none'}
-
+pre=[]
+prev=[]
 
 @app.callback(
-    Output('dynamic-dropdown-container2','style'),
-    Output('click_browser_label','style'),
-    Input('req_attr','value')
-)
-def category_dropdown(req_attr):
-    if req_attr is not None and 'click_browser' in req_attr:
-        return {'display': 'block'},{'display': 'block'}
-    else:
-        return {'display': 'none'},{'display': 'none'}
+    Output('dynamic_dropdown', 'children'),
+   #Input('submit-button-state', 'n_clicks'),
+    State('dynamic_dropdown', 'children'),
+    Input('req_attr','value'))
+def display_dropdowns(children,req_attr):
+    children=[]
 
+    if req_attr is not None and len(req_attr)!=0:
+        for col in req_attr:
+            children.append(temp_list1[col])
+            children.append(temp_list2[col])
+    #prev=req_attr
+    return children
 
-@app.callback(
-    Output('dynamic-dropdown-container3','style'),
-    Output('enriched_country_label','style'),
-    Input('req_attr','value')
-)
-def category_dropdown(req_attr):
-    if req_attr is not None and 'enriched_country' in req_attr:
-        return {'display': 'block'},{'display': 'block'}
-    else:
-        return {'display': 'none'},{'display': 'none'}
 
 
 
@@ -185,24 +118,25 @@ def category_dropdown(req_attr):
     Output('timeline_graph','figure'),
     Output('graph','figure'),
     Output('conv_status', 'figure'),
+    #Output('dynamic_dropdown','children'),
+
     #Output('div-1', 'children'),
-    Input('visitor_id', 'value'),
-    Input('start_date', 'value'),
-    Input('end_date', 'value'),
-    Input('req_attr','value'),
-    Input('top_level_category_name_label','value'),
-    Input('click_browser_label','value'),
-    Input('enriched_country_label','value'),
+    #Input('submit-button-state', 'n_clicks'),
+    State('visitor_id', 'value'),
+    State('start_date', 'value'),
+    State('end_date', 'value'),
+    State('req_attr','value'),
+    Input({'type': 'dynamic-output', 'index': ALL}, 'value'),
+    State({'type': 'dynamic-output', 'index': ALL}, 'id')
 
     )
-def dashboard(visitor_id,start_date,end_date,req_attr,top_level_category_name_label,click_browser_label,enriched_country_label):
+def dashboard(visitor_id,start_date,end_date,req_attr,id,values):
+    
     dff = new_df[new_df['visitor_id']==visitor_id]
     dff_1 =dff[dff['ts_date']>=start_date]
     dff_2=dff_1[dff_1['ts_date']<=end_date]
 
-   # dff_2=dff_11.groupby('date_time',as_index=False)
 
-    #dff_2['Event_number']= dff_2.groupby('date_time').cumcount()+1
      
     df_grouped_conv = dff_2.groupby(['conversion_status'])['conversion_status'].count()
     dff_grouped_conv=pd.DataFrame({'conversion_status':df_grouped_conv.index, 'count':df_grouped_conv.values})
@@ -211,49 +145,21 @@ def dashboard(visitor_id,start_date,end_date,req_attr,top_level_category_name_la
 
     dff_timeline=dff_2
 
-    flag=1
-
-    if top_level_category_name_label is not None and len(top_level_category_name_label)!=0:
-        flag=0
-        if 'top_level_category_name' not in req_attr:
-            top_level_category_name_label=[]
-            flag=1
-        else:
-            dff_timeline=dff_2.loc[dff_2.top_level_category_name.isin(top_level_category_name_label)]
-        print("cate: ")
-        print(top_level_category_name_label)
-        
-
-    if click_browser_label is not None and len(click_browser_label)!=0:
-        
-        flag=0
-        if 'click_browser' not in req_attr:
-            click_browser_label =[]
-            flag=1
-        else:
-            dff_timeline=dff_timeline.loc[dff_timeline.click_browser.isin(click_browser_label)]
-
-        print("browser: ")
-        print(click_browser_label)
-    
-    if enriched_country_label is not None and len(enriched_country_label)!=0:
-        flag=0
-        if 'enriched_country' not in req_attr:
-            enriched_country_label =[]
-            flag=1
-        else:
-            dff_timeline=dff_timeline.loc[dff_timeline.enriched_country.isin(enriched_country_label)]
-        print("country: ")
-        print(enriched_country_label)
+    for (i, value) in enumerate(values):
+        if value is not None and len(value)!=0:
+            #col=[]
+            #col.append(list_col[value['index']])
+            col=list_col[value['index']]
+            print(col)
+            print(value)
+            print(id[i])
+            if id[i] is not None and len(id[i])!=0:
+                dff_timeline=dff_2.loc[dff_2[col].isin(id[i])]
     
     dff_timeline['Event_number']= dff_timeline.groupby('date_time').cumcount()+1
     dff_timeline['conversion_status']=dff_timeline['conversion_status'].astype(str)
-    if flag==1:
-        #fig_timeline =px.scatter(dff_2,x='in_date', y='hour',hover_data=req_attr)
-        fig_timeline =px.scatter(dff_timeline,x='date_time', y='Event_number',color='conversion_status',hover_data=req_attr)
-    else:
-        #fig_timeline =px.scatter(dff_timeline,x='in_date', y='hour',hover_data=req_attr)
-        fig_timeline =px.scatter(dff_timeline,x='date_time', y='Event_number',color='conversion_status',hover_data=req_attr)
+
+    fig_timeline =px.scatter(dff_timeline,x='date_time', y='Event_number',color='conversion_status',hover_data=req_attr)
         
     #top_level_category_name_label=[]
     #click_browser_label =[]
@@ -265,7 +171,7 @@ def dashboard(visitor_id,start_date,end_date,req_attr,top_level_category_name_la
     dff_3=pd.DataFrame({'enriched_country':df_grouped.index, 'count':df_grouped.values})
 
     fig = px.pie(dff_3, values='count', names='enriched_country', title='Population of European continent')
-    return  fig_timeline,fig,fig_conv,#dash_table.DataTable(dff_2.to_dict('records'), [{"name": i, "id": i} for i in dff_2.columns])
+    return  fig_timeline,fig,fig_conv,#children,#dash_table.DataTable(dff_2.to_dict('records'), [{"name": i, "id": i} for i in dff_2.columns])
 
 
 
