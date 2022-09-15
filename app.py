@@ -9,14 +9,14 @@ import numpy as np
 
 df=pd.read_csv('visitor_data_native.csv',delimiter='|',low_memory=False)
 updated_cols=['ts_date', 'hour', 'conversion_status','raw_publisher_id','enriched_country', 'enriched_derived_device', 'enriched_derived_os','enriched_publisher_domain', 'ad_adgroup_id', 'ad_advertiser_id','ad_campaign_id', 'ad_keyword','click_browser', 'click_state','click_city', 'click_click_status', 'conv_weight', 'conv_value', 'top_level_category_name','seller_tag_id', 'integration_type', 'visitor_id']
-categorical_values=['conversion_status','raw_publisher_id','enriched_country', 'enriched_derived_device', 'enriched_derived_os','enriched_publisher_domain', 'ad_adgroup_id', 'ad_advertiser_id','ad_campaign_id', 'ad_keyword','click_browser', 'click_state','click_city', 'click_click_status','top_level_category_name','seller_tag_id', 'integration_type']
+categorical_values=['raw_publisher_id','enriched_country', 'enriched_derived_device', 'enriched_derived_os','enriched_publisher_domain', 'ad_adgroup_id', 'ad_advertiser_id','ad_campaign_id', 'ad_keyword','click_browser', 'click_state','click_city', 'click_click_status','top_level_category_name','seller_tag_id', 'integration_type']
 new_df=df[updated_cols].sort_values(by=['ts_date','hour'])
 new_df[['in_date']] = new_df[['ts_date']].applymap(str).applymap(lambda s: "{}/{}/{}".format(s[4:6],s[6:], s[0:4]))
 new_df[['time']]=new_df[['hour']].applymap(str)
 new_df['time_str']=new_df['time'].str.zfill(2)
 new_df['in_date']=new_df['in_date'].apply(lambda s:s+"T")
 new_df['date_time']=new_df['in_date']+new_df['time_str']
-new_df=new_df.sort_values(by=['visitor_id','date_time'])
+new_df=new_df.sort_values(by=['visitor_id','date_time','conversion_status'])
 list_col = updated_cols
 temp_list1 ={}
 temp_list2 ={}
@@ -35,6 +35,7 @@ for col in list_col:
         cnt+=1
 
 
+cols_reqi=['hour','conversion_status','enriched_derived_device','enriched_derived_os','click_browser','click_state','click_city','top_level_category_name']
 
 
 app = Dash(__name__)
@@ -91,11 +92,29 @@ app.layout = html.Div([
 
     html.Div(id='timeline_text_pro',style={"maxHeight": "400px", "overflow": "scroll"}),
 
-    html.Div([
-        html.Div(children=[],id='dates',style={"maxHeight": "50px", "overflow": "scroll",'display':'flex'}),
-        html.Div(children=[],id='div-1',style={"maxHeight": "400px", "overflow": "scroll",'display':'flex'}),
+    html.Div(
+        [   
+            html.Div(
+                [html.Div(children=[],id='date_heading',style={"maxHeight": "50px", "overflow": "scroll",'display':'flex'}),
+                html.Div(children=[],id='attr_heading',style={"maxHeight": "400px", "overflow": "scroll",'display':'flex'}),]
+            ),
+            
+            html.Div([
+                html.Div(children=[],id='dates',style={"maxHeight": "50px", "overflow": "scroll",'display':'flex'}),
+                html.Div(children=[],id='div-1',style={"maxHeight": "400px", "overflow": "scroll",'display':'flex'}),
 
-    ],style={"maxHeight": "500px", "overflow": "scroll"}),
+            ],style={"maxHeight": "500px", "overflow": "scroll",'display':'flex'}),
+
+        ],
+        id='total_table',
+        style={"maxHeight": "500px", "overflow": "scroll",'display':'flex'}
+    ),
+
+    #html.Div([
+        #html.Div(children=[],id='dates',style={"maxHeight": "50px", "overflow": "scroll",'display':'flex'}),
+       # html.Div(children=[],id='div-1',style={"maxHeight": "400px", "overflow": "scroll",'display':'flex'}),
+
+   # ],style={"maxHeight": "500px", "overflow": "scroll"}),
     
     #html.Div(children=[],id='div-1',style={"maxHeight": "400px", "overflow": "scroll",'display':'flex'}),
 
@@ -116,17 +135,6 @@ prev=[]
     Input('req_attr','value'))
 def display_dropdowns(children,req_attr):
     children=[]
-    #print(prev)
-    #print(req_attr)
-
-    #if prev is not None and len(prev)!=0:
-    #    if prev[-1] is not None and len(prev[-1])!=0:
-    #        for col in prev[-1]:
-    #           if col not in req_attr:
-    #                print("inprev")
-    #               children.remove(temp_list1[col])
-    #               children.remove(temp_list2[col]) 
-
     if req_attr is not None and len(req_attr)!=0:
         for col in req_attr:
             children.append(temp_list1[col])
@@ -138,7 +146,22 @@ def display_dropdowns(children,req_attr):
     return children
 
 
-cols_reqi=['hour','conversion_status','enriched_derived_device','enriched_derived_os','click_browser','click_state','click_city','top_level_category_name']
+@app.callback(
+    Output(
+        'total_table','style'
+    ),
+    Input('req_attr','value'),
+)
+def update_fig_table(req_attr):
+    if req_attr is not None:
+        return {"maxHeight": "500px", "overflow": "scroll",'display':'flex'}
+    else:
+        return {'display': 'none'}
+
+
+
+
+
 
 @app.callback(
 
@@ -148,7 +171,7 @@ cols_reqi=['hour','conversion_status','enriched_derived_device','enriched_derive
     #Output('timeline_text','children'),
     #Output('timeline_text_pro','children'),
     #Output('dynamic_dropdown','children'),
-
+    Output('attr_heading','children'),
     Output('div-1', 'children'),
     #Output('dates','children'),
     #Input('submit-button-state', 'n_clicks'),
@@ -167,7 +190,13 @@ def dashboard(visitor_id,start_date,end_date,req_attr,children,id,values):
     dff_1 =dff[dff['ts_date']>=start_date]
     dff_2=dff_1[dff_1['ts_date']<=end_date]
 
-
+    if req_attr is None or len(req_attr)==0:
+        req_attr=['hour','conversion_status']
+    else:
+        req_attr=['conversion_status']+req_attr
+        req_attr=['hour']+req_attr
+        
+    
      
     df_grouped_conv = dff_2.groupby(['conversion_status'])['conversion_status'].count()
     dff_grouped_conv=pd.DataFrame({'conversion_status':df_grouped_conv.index, 'count':df_grouped_conv.values})
@@ -178,12 +207,7 @@ def dashboard(visitor_id,start_date,end_date,req_attr,children,id,values):
 
     for (i, value) in enumerate(values):
         if value is not None and len(value)!=0:
-            #col=[]
-            #col.append(list_col[value['index']])
             col=list_col[value['index']]
-            print(col)
-            print(value)
-            print(id[i])
             if id[i] is not None and len(id[i])!=0:
                 dff_timeline=dff_timeline.loc[dff_timeline[col].isin(id[i])]
     
@@ -191,10 +215,6 @@ def dashboard(visitor_id,start_date,end_date,req_attr,children,id,values):
     dff_timeline['conversion_status']=dff_timeline['conversion_status'].astype(str)
 
     fig_timeline =px.scatter(dff_timeline,x='date_time', y='Event_number',color='conversion_status',hover_data=req_attr)
-        
-    #top_level_category_name_label=[]
-    #click_browser_label =[]
-    #enriched_country_label =[]
 
     fig_timeline.update_yaxes(visible=False, showticklabels=False)
 
@@ -227,37 +247,70 @@ def dashboard(visitor_id,start_date,end_date,req_attr,children,id,values):
         list_r=[]
         for index, row in dff_tempi.iterrows():
           finall=""
-          for col in cols_reqi:
+          for col in req_attr:
               finall=finall+col+": "+str(row[col])+" "
           list_r.append(finall)
         df_data =pd.DataFrame(list_r,columns =[i])
         #print(df_data)
         #finall=dff_tempi[cols_reqi].to_dict('records')
-        dff_tempo=dff_tempi[cols_reqi]
+        dff_temp=dff_tempi[req_attr]
+        dff_tempo=dff_temp.T
         #dff_rw.append(finall)
         child.append(html.Div(i))
         rd=df_data.to_dict('records')
-        child.append(dash_table.DataTable(dff_tempo.to_dict('records'), [{"name": i, "id": i} for i in dff_tempo.columns],fixed_rows={'headers': True},style_table={'overflowX': 'auto'},style_cell={'height': 'auto','minWidth': '180px', 'width': '180px', 'maxWidth': '180px','whiteSpace': 'normal'},style_data_conditional=[
-        {
-            'if': {
-                'filter_query': '{conversion_status}>=1',
-            },
-            'backgroundColor': '#FF4136',
-            'color': 'white'
-        },
-    ]))
-        children.append(html.Div(child))
-    #dffr=[]
-    #chi=[]
-    #dffr.append(dff_rw)
-    #print(len(dff_rw))
-    #df_data =pd.DataFrame(dffr,columns = keys)
+        #print(dff_tempo.to_dict('records'))
+        list_int=[]
+        for i in range(len(dff_tempo.columns)):
+            list_int.append("Event "+str(i+1))
+            
+        dff_tempo.columns=list_int
+
+        color_list=[]
+        for col in dff_tempo.columns:
+            if dff_tempo[col]['conversion_status']==1:
+                color_list.append(col[-1])
+
+
+        child.append(dash_table.DataTable(dff_tempo.to_dict('records'),fixed_rows={'headers': True},style_table={'overflowX': 'scroll','minWidth': '50%',"maxWidth": "600px"},
+            style_header_conditional=[
+                    {
+                    'if': {
+                         'column_id' : "Event "+i,
+                    },
+                    'backgroundColor': '#FF4136',
+                    'color': 'white'
+                } for i in color_list
+
+            ]
+        
+        
+        
+        ))
+        children.append(html.Div(child,style={"margin-left": "15px"}))
+   
     #chi.append(dash_table.DataTable(df_data.to_dict('records'),[{"name": i, "id": i} for i in df_data.columns],fixed_rows={'headers': True},style_table={'overflowX': 'auto'},style_cell={'height': 'auto','minWidth': '180px', 'width': '180px', 'maxWidth': '180px','whiteSpace': 'normal'},))
 
 
-    return  fig_timeline,fig,fig_conv,children#,child
+    table_cols=[]
+    table_cols.append(html.Div("Time"))
+    if req_attr is None or len(req_attr)==0:
+        dframe=pd.DataFrame(['conversion_status'])
+    else:
+        dframe = pd.DataFrame(req_attr)  
+    dframe.columns=["Events"]
+    table_cols.append(dash_table.DataTable(dframe.to_dict('records'),fixed_rows={'headers': True},style_table={'overflowX': 'scroll','minWidth': '50%',"maxWidth": "600px"}))
+
+    child_fixed=[]  
+    child_fixed.append(html.Div(table_cols,style={"margin-left": "15px"}))
+
+
+
+    return  fig_timeline,fig,fig_conv,child_fixed,children#,child
 
 
 
 if __name__ == '__main__':
     app.run_server(debug=True)
+
+
+#style_cell={'height': 'auto','minWidth': '180px', 'width': '180px', 'maxWidth': '180px','whiteSpace': 'normal'}
